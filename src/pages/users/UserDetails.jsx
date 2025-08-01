@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { API_ENDPOINTS, axiosInstance } from "../../api/ApiConfig";
 
 const UserDetails = ({ userData, closeViewModal }) => {
-  const [isViewMode, setIsViewMode] = useState(false); // To handle view/edit toggle
+  const [isViewMode, setIsViewMode] = useState(true); // To handle view/edit toggle
   const {
     register,
     handleSubmit,

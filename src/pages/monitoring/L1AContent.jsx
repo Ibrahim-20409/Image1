@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -6,57 +6,51 @@ import { API_ENDPOINTS, axiosInstance } from "../../api/ApiConfig";
 
 const L1AContent = () => {
   const [errors, setErrors] = useState({
-    satelliteImages: "",
-    jsonFile: "",
     calibrationDatasets: "",
   });
 
   const [selectedFiles, setSelectedFiles] = useState({
-    satelliteImages: [],
-    jsonFile: [],
     calibrationDatasets: [],
   });
+
   const [performCalibration, setPerformCalibration] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [receivedFiles, setReceivedFiles] = useState([]);
 
-  const handleFileChange = (event, type) => {
+  useEffect(() => {
+    const handleFilesProcessed = (event) => {
+      setReceivedFiles(event.detail);
+    };
+    window.addEventListener('filesProcessed', handleFilesProcessed);
+    return () => {
+      window.removeEventListener('filesProcessed', handleFilesProcessed);
+    };
+  }, []);
+
+  const imageCount = receivedFiles.filter(file => file.type === 'image').length;
+  const jsonCount = receivedFiles.some(file => file.type === 'json') ? 1 : 0;
+
+  const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
     let errorMessage = "";
 
-    if (!files.length) {
-      setErrors((prev) => ({ ...prev, [type]: "" }));
-      setSelectedFiles((prev) => ({ ...prev, [type]: [] }));
-      return;
-    }
-
-    if (type === "satelliteImages") {
-      const invalid = files.some((file) => !file.type.startsWith("image/"));
-      if (invalid) errorMessage = "Please select only image files.";
-    } else if (type === "jsonFile") {
-      if (files.length > 1 || files[0].type !== "application/json") {
-        errorMessage = "Please select a single valid JSON file.";
-      }
-    }
+    const invalid = files.some(
+      (file) =>
+        !file.type.startsWith("image/png") && !file.type.startsWith("image/jpeg")
+    );
+    if (invalid) errorMessage = "Please select valid image files.";
 
     if (errorMessage) {
-      setErrors((prev) => ({ ...prev, [type]: errorMessage }));
-      setSelectedFiles((prev) => ({ ...prev, [type]: [] }));
+      setErrors({ calibrationDatasets: errorMessage });
+      setSelectedFiles({ calibrationDatasets: [] });
     } else {
-      setErrors((prev) => ({ ...prev, [type]: "" }));
-      setSelectedFiles((prev) => ({ ...prev, [type]: files }));
+      setErrors({ calibrationDatasets: "" });
+      setSelectedFiles({ calibrationDatasets: files });
     }
   };
 
   const handleSubmit = async () => {
     const formData = new FormData();
-
-    selectedFiles.satelliteImages.forEach((file) => {
-      formData.append("satellite_images", file);
-    });
-
-    if (selectedFiles.jsonFile.length > 0) {
-      formData.append("json_file", selectedFiles.jsonFile[0]);
-    }
 
     selectedFiles.calibrationDatasets.forEach((file) => {
       formData.append("calibration_datasets", file);
@@ -127,10 +121,7 @@ const L1AContent = () => {
     }
   };
 
-  const isUploadDisabled =
-    selectedFiles.satelliteImages.length === 0 &&
-    selectedFiles.jsonFile.length === 0 &&
-    selectedFiles.calibrationDatasets.length === 0;
+  const isUploadDisabled = selectedFiles.calibrationDatasets.length === 0;
 
   return (
     <div className="flex justify-center w-full pt-4">
@@ -153,67 +144,72 @@ const L1AContent = () => {
           <p className="text-xs text-gray-400">Data Processing Interface</p>
         </div>
 
-        {[
-          {
-            id: "satellite-images",
-            label: "Satellite Images",
-            type: "satelliteImages",
-            accept: "image/*",
-            multiple: true,
-            icon: "🛰️",
-          },
-          {
-            id: "json-file",
-            label: "JSON Config",
-            type: "jsonFile",
-            accept: ".json",
-            multiple: false,
-            icon: "📋",
-          },
-          {
-            id: "calibration-datasets",
-            label: "Calibration Datasets",
-            type: "calibrationDatasets",
-            accept: "image/png, image/jpeg",
-            multiple: true,
-            icon: "🎯",
-          },
-        ].map(({ id, label, type, accept, multiple, icon }) => (
-          <div
-            key={id}
-            className="w-full flex flex-col items-center relative group"
+        {/* Satellite Images Button with Dynamic Counter */}
+        <div className="w-full flex flex-col items-center">
+          <button
+            type="button"
+            className="w-full max-w-xs px-4 py-1 text-2xs font-medium rounded-md transition-all duration-200 bg-gray-800 border border-gray-600 text-gray-200 flex items-center justify-center space-x-2"
           >
-            <label
-              htmlFor={id}
-              className="w-full max-w-xs px-4 py-1 text-2xs font-medium rounded-md transition-all duration-200 bg-gray-800 hover:bg-gray-750 border border-gray-600 hover:border-blue-400 text-gray-200 hover:text-white cursor-pointer flex items-center justify-center space-x-2"
-            >
-              <span className="text-xs">{icon}</span>
-              <span>{label}</span>
-            </label>
-            <input
-              id={id}
-              type="file"
-              className="hidden"
-              accept={accept}
-              multiple={multiple}
-              onChange={(e) => handleFileChange(e, type)}
-            />
-            {errors[type] && (
-              <div className="text-xs text-red-500 mt-1">{errors[type]}</div>
-            )}
-            <input
-              type="text"
-              readOnly
-              value={`${selectedFiles[type].length} Files`}
-              className="w-14 max-w-xs px-1 py-1 mt-2 text-xs text-white bg-gray-900 border border-gray-600 rounded-md focus:outline-none"
-            />
-            <div className="absolute z-10 top-10 invisible opacity-10 group-hover:opacity-100 group-hover:visible transition-opacity duration-300 px-3 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg shadow-xs">
-              {selectedFiles[type].map((file) => (
-                <div key={file.name}>{file.name}</div>
-              ))}
-            </div>
+            <span className="text-xs">🛰️</span>
+            <span>Satellite Images</span>
+          </button>
+          <input
+            type="text"
+            readOnly
+            value={`${imageCount} Files`}
+            className="w-14 max-w-xs px-1 py-1 mt-2 text-xs text-white bg-gray-900 border border-gray-600 rounded-md focus:outline-none"
+          />
+        </div>
+
+        {/* JSON Config Button with Dynamic Counter */}
+        <div className="w-full flex flex-col items-center">
+          <button
+            type="button"
+            className="w-full max-w-xs px-4 py-1 text-2xs font-medium rounded-md transition-all duration-200 bg-gray-800 border border-gray-600 text-gray-200 flex items-center justify-center space-x-2"
+          >
+            <span className="text-xs">📋</span>
+            <span>JSON Config</span>
+          </button>
+          <input
+            type="text"
+            readOnly
+            value={`${jsonCount} Files`}
+            className="w-14 max-w-xs px-1 py-1 mt-2 text-xs text-white bg-gray-900 border border-gray-600 rounded-md focus:outline-none"
+          />
+        </div>
+
+        {/* Calibration Datasets (Working Input) */}
+        <div className="w-full flex flex-col items-center relative group">
+          <label
+            htmlFor="calibration-datasets"
+            className="w-full max-w-xs px-4 py-1 text-2xs font-medium rounded-md transition-all duration-200 bg-gray-800 hover:bg-gray-750 border border-gray-600 hover:border-blue-400 text-gray-200 hover:text-white cursor-pointer flex items-center justify-center space-x-2"
+          >
+            <span className="text-xs">🎯</span>
+            <span>Calibration Datasets</span>
+          </label>
+          <input
+            id="calibration-datasets"
+            type="file"
+            className="hidden"
+            accept="image/png, image/jpeg"
+            multiple
+            onChange={handleFileChange}
+          />
+          {errors.calibrationDatasets && (
+            <div className="text-xs text-red-500 mt-1">{errors.calibrationDatasets}</div>
+          )}
+          <input
+            type="text"
+            readOnly
+            value={`${selectedFiles.calibrationDatasets.length} Files`}
+            className="w-14 max-w-xs px-1 py-1 mt-2 text-xs text-white bg-gray-900 border border-gray-600 rounded-md focus:outline-none"
+          />
+          <div className="absolute z-10 top-10 invisible opacity-10 group-hover:opacity-100 group-hover:visible transition-opacity duration-300 px-3 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg shadow-xs">
+            {selectedFiles.calibrationDatasets.map((file) => (
+              <div key={file.name}>{file.name}</div>
+            ))}
           </div>
-        ))}
+        </div>
 
         <button
           className={`w-full max-w-xs px-4 py-2 rounded-md mt-4 ${
@@ -248,12 +244,12 @@ const L1AContent = () => {
             Start Calibration
           </button>
         )}
+
         <div className="w-full text-center mt-4 pt-3 border-t border-gray-800">
           <p className="text-xs text-gray-500">• SpectraGen L1A Standard •</p>
         </div>
       </div>
-      </div>
-    
+    </div>
   );
 };
 
